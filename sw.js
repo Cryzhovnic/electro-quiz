@@ -1,4 +1,4 @@
-const CACHE = 'electro-quiz-v12';
+const CACHE = 'electro-quiz-v14';
 const ASSETS = [
   './',
   './index.html',
@@ -25,17 +25,36 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// HTML/JS/JSON — сначала сеть (чтобы обновления доходили), картинки — из кэша
 self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then((cached) => {
-      const fetched = fetch(e.request).then((res) => {
-        if (res && res.status === 200 && e.request.method === 'GET') {
+  const url = new URL(e.request.url);
+  if (e.request.method !== 'GET') return;
+
+  const path = url.pathname;
+  const isCode = path.endsWith('.html') || path.endsWith('.js') || path.endsWith('.json') ||
+    path.endsWith('/') || path.endsWith('/electro-quiz') || !path.split('/').pop().includes('.');
+
+  if (isCode) {
+    e.respondWith(
+      fetch(e.request).then((res) => {
+        if (res && res.status === 200) {
           const clone = res.clone();
           caches.open(CACHE).then((cache) => cache.put(e.request, clone));
         }
         return res;
-      }).catch(() => cached);
-      return cached || fetched;
-    })
-  );
+      }).catch(() => caches.match(e.request))
+    );
+  } else {
+    e.respondWith(
+      caches.match(e.request).then((cached) => {
+        return cached || fetch(e.request).then((res) => {
+          if (res && res.status === 200) {
+            const clone = res.clone();
+            caches.open(CACHE).then((cache) => cache.put(e.request, clone));
+          }
+          return res;
+        });
+      })
+    );
+  }
 });
