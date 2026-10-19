@@ -157,7 +157,8 @@ function renderDots() {
 function jumpTo(i) {
   const workIdx = firstUnanswered();
   if (!state.review && state.answers[i] === null && i !== state.current && i !== workIdx) return;
-  state.browsingPast = !state.review && state.answers[i] !== null && workIdx !== -1 && i !== workIdx;
+  // browsingPast только если реально ушли на другой (уже отвеченный) вопрос
+  state.browsingPast = !state.review && state.answers[i] !== null && workIdx !== -1 && i !== workIdx && i !== state.current;
   state.current = i;
   renderQuestion();
 }

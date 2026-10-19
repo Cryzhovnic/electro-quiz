@@ -1,4 +1,4 @@
-const CACHE = 'electro-quiz-v14';
+const CACHE = 'electro-quiz-v16';
 const ASSETS = [
   './',
   './index.html',
