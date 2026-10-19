@@ -2,7 +2,9 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="Тестирование по электробезопасности: 10 билетов, 100 вопросов." />
   <meta name="theme-color" content="#0f172a" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -12,45 +14,8 @@
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icons/icon-192.png" />
   <title>Электробезопасность — Тестирование</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            primary: { 50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc', 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e' },
-            accent: { 400: '#34d399', 500: '#10b981', 600: '#059669' }
-          },
-          fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif']
-          },
-          animation: {
-            'fade-in': 'fadeIn 0.35s ease-out',
-            'slide-up': 'slideUp 0.4s ease-out',
-            'scale-in': 'scaleIn 0.3s ease-out',
-            'pulse-soft': 'pulseSoft 2s infinite'
-          },
-          keyframes: {
-            fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
-            slideUp: { '0%': { opacity: '0', transform: 'translateY(16px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-            scaleIn: { '0%': { opacity: '0', transform: 'scale(0.95)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
-            pulseSoft: { '0%, 100%': { opacity: '1' }, '50%': { opacity: '0.7' } }
-          }
-        }
-      }
-    }
-  </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    * { -webkit-tap-highlight-color: transparent; }
-    body { overscroll-behavior: none; }
-    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
-    .option-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-    .option-btn:active { transform: scale(0.98); }
-    .glass { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); }
-  </style>
+  <link rel="preload" href="assets/fonts/inter-var-latin-cyrillic.woff" as="font" type="font/woff" crossorigin />
+  <link rel="stylesheet" href="css/tailwind.css" />
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen antialiased">
 
@@ -58,7 +23,10 @@
   <div id="screen-start" class="min-h-screen flex flex-col">
     <div class="flex-1 flex flex-col items-center justify-center px-5 py-10">
       <div class="mb-6 animate-scale-in overflow-hidden rounded-2xl border border-slate-700 shadow-lg shadow-sky-500/10 w-44 sm:w-52">
-        <img src="assets/bandit.gif" alt="" class="w-full h-auto block" width="240" height="136" />
+        <picture>
+          <source srcset="assets/bandit.webp" type="image/webp" />
+          <img src="assets/bandit.gif" alt="" class="w-full h-auto block" width="240" height="135" />
+        </picture>
       </div>
       <h1 class="text-2xl sm:text-3xl font-bold text-center mb-2 animate-slide-up">Электробезопасность</h1>
       <p class="text-slate-400 text-center mb-10 animate-slide-up">Тестирование по билетам</p>
@@ -74,14 +42,14 @@
         </button>
       </div>
     </div>
-    <p class="text-center text-[11px] text-slate-700 pb-5 safe-bottom select-none">Made by Egor O.</p>
+    <p class="text-center text-[11px] text-slate-700 pb-[calc(1.25rem+env(safe-area-inset-bottom))] select-none">Made by Egor O.</p>
   </div>
 
   <!-- ===== ЭКРАН: ВЫБОР БИЛЕТА ===== -->
   <div id="screen-tickets" class="min-h-screen flex flex-col hidden">
-    <header class="sticky top-0 z-10 glass border-b border-slate-800 px-4 py-4 safe-bottom">
+    <header class="sticky top-0 z-10 glass border-b border-slate-800 px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
       <div class="flex items-center gap-3 max-w-lg mx-auto">
-        <button onclick="goStart()" class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center active:scale-95 transition">
+        <button type="button" onclick="goStart()" aria-label="Назад" class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center active:scale-95 transition">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
         </button>
         <h2 class="text-lg font-semibold">Выберите билет</h2>
@@ -94,7 +62,7 @@
 
   <!-- ===== ЭКРАН: ВОПРОС ===== -->
   <div id="screen-quiz" class="min-h-screen flex flex-col hidden">
-    <header class="sticky top-0 z-10 glass border-b border-slate-800 px-4 pt-4 pb-3">
+    <header class="sticky top-0 z-10 glass border-b border-slate-800 px-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-3">
       <div class="max-w-lg mx-auto">
         <div class="flex items-center justify-between mb-3">
           <span id="quiz-ticket" class="text-sm font-medium text-sky-400">Билет 1</span>
@@ -102,7 +70,7 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
           </button>
         </div>
-        <div id="quiz-dots" class="flex gap-1.5 justify-between"></div>
+        <div id="quiz-dots" class="flex gap-1.5 justify-between" role="group" aria-label="Вопросы билета"></div>
       </div>
     </header>
 
@@ -120,13 +88,13 @@
         </button>
         <!-- режим просмотра: 3 в ряд -->
         <div id="review-nav" class="hidden grid grid-cols-3 gap-2">
-          <button type="button" id="btn-prev" class="py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition-all flex items-center justify-center">
+          <button type="button" id="btn-prev" aria-label="Предыдущий вопрос" class="py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition-all flex items-center justify-center">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
           </button>
-          <button type="button" id="btn-to-result" class="py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition-all flex items-center justify-center">
+          <button type="button" id="btn-to-result" aria-label="К результату" class="py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition-all flex items-center justify-center">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h3a1 1 0 001-1V10"/></svg>
           </button>
-          <button type="button" id="btn-review-next" class="py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition-all flex items-center justify-center">
+          <button type="button" id="btn-review-next" aria-label="Следующий вопрос" class="py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition-all flex items-center justify-center">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
           </button>
         </div>
@@ -165,13 +133,13 @@
 
 
   <!-- Модалка выхода -->
-  <div id="exit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-5">
+  <div id="exit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-5" role="dialog" aria-modal="true" aria-labelledby="exit-modal-title">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeExitModal()"></div>
     <div class="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-2xl animate-scale-in">
-      <p class="text-lg font-semibold text-center mb-2">Выйти на главную?</p>
+      <p id="exit-modal-title" class="text-lg font-semibold text-center mb-2">Выйти на главную?</p>
       <p class="text-sm text-slate-400 text-center mb-6">Прогресс по этому билету не сохранится</p>
       <div class="flex gap-3">
-        <button type="button" onclick="closeExitModal()" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition">
+        <button type="button" id="exit-stay" onclick="closeExitModal()" class="flex-1 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-medium active:scale-[0.98] transition">
           Остаться
         </button>
         <button type="button" onclick="confirmExit()" class="flex-1 py-3 rounded-xl bg-red-600/90 hover:bg-red-500 text-white font-semibold active:scale-[0.98] transition">

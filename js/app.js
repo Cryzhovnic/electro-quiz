@@ -29,14 +29,18 @@ function qCount() {
 }
 
 // answers[i] = { options, correctIdx, chosen, isCorrect } | null
+// plan[i]    = { options, correctIdx } — порядок вариантов, зафиксированный при старте билета
 let state = {
   ticket: null,
   current: 0,
   answers: [],
+  plan: [],
   mode: null,
   review: false,
   browsingPast: false
 };
+let lastRandomTicket = null;
+let exitModalOpener = null;
 
 function freshAnswers(n) {
   return Array(n).fill(null);
@@ -50,20 +54,29 @@ function showScreen(id) {
 }
 
 function goStart() {
-  state = { ticket: null, current: 0, answers: [], mode: null, review: false, browsingPast: false };
+  state = { ticket: null, current: 0, answers: [], plan: [], mode: null, review: false, browsingPast: false };
   closeExitModal();
   showScreen('start');
 }
 
 function exitQuiz() {
+  exitModalOpener = document.activeElement;
   document.getElementById('exit-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
+  const stay = document.getElementById('exit-stay');
+  if (stay) stay.focus();
 }
 function closeExitModal() {
   const m = document.getElementById('exit-modal');
+  const wasOpen = m && !m.classList.contains('hidden');
   if (m) m.classList.add('hidden');
   document.body.style.overflow = '';
+  if (wasOpen && exitModalOpener && document.contains(exitModalOpener)) exitModalOpener.focus();
+  exitModalOpener = null;
 }
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeExitModal();
+});
 function confirmExit() {
   closeExitModal();
   goStart();
@@ -86,8 +99,10 @@ function showTickets() {
 }
 
 function startRandom() {
-  const tickets = Object.keys(examData).map(Number);
+  let tickets = Object.keys(examData).map(Number);
+  if (tickets.length > 1) tickets = tickets.filter(t => t !== lastRandomTicket);
   const ticket = tickets[Math.floor(Math.random() * tickets.length)];
+  lastRandomTicket = ticket;
   startQuiz(ticket, 'random');
 }
 
@@ -97,6 +112,7 @@ function startQuiz(ticket, mode) {
     ticket,
     current: 0,
     answers: freshAnswers(n),
+    plan: examData[ticket].map(q => buildOptions(q, mode === 'random')),
     mode,
     review: false,
     browsingPast: false
@@ -149,7 +165,10 @@ function renderDots() {
       cls += ' opacity-40 cursor-default';
     }
     btn.className = cls;
+    const status = a === null ? 'не отвечен' : a.isCorrect ? 'верно' : 'неверно';
     btn.title = 'Вопрос ' + (i + 1);
+    btn.setAttribute('aria-label', 'Вопрос ' + (i + 1) + ', ' + status);
+    if (i === state.current) btn.setAttribute('aria-current', 'step');
     box.appendChild(btn);
   }
 }
@@ -173,6 +192,22 @@ function shuffleIndices(n) {
   return indices;
 }
 
+// Варианты вида «Все ответы неверны», «Все перечисленные…» зависят от остальных —
+// при перемешивании они остаются в конце (в исходном относительном порядке).
+const PINNED_LAST = /все (ответы|вышеперечисленн|перечисленн|указанн)|во всех перечисленных/i;
+
+function buildOptions(q, shuffle) {
+  if (!shuffle) return { options: q.options.slice(), correctIdx: q.correct };
+  const movable = [];
+  const pinned = [];
+  q.options.forEach((opt, i) => (PINNED_LAST.test(opt) ? pinned : movable).push(i));
+  const order = shuffleIndices(movable.length).map(k => movable[k]).concat(pinned);
+  return {
+    options: order.map(i => q.options[i]),
+    correctIdx: order.indexOf(q.correct)
+  };
+}
+
 function renderQuestion() {
   const n = qCount();
   if (state.current < 0 || state.current >= n) state.current = 0;
@@ -184,22 +219,15 @@ function renderQuestion() {
   document.getElementById('quiz-ticket').textContent =
     (state.review ? 'Просмотр · ' : '') + 'Билет ' + state.ticket;
 
-  let options, correctIdx;
-  if (saved) {
-    options = saved.options;
-    correctIdx = saved.correctIdx;
-  } else {
-    options = q.options.slice();
-    correctIdx = q.correct;
-    if (state.mode === 'random') {
-      const indices = shuffleIndices(options.length);
-      options = indices.map(i => q.options[i]);
-      correctIdx = indices.indexOf(q.correct);
-    }
-  }
+  const shown = saved || state.plan[state.current];
+  const options = shown.options;
+  const correctIdx = shown.correctIdx;
 
-  state._opts = options;
-  state._correct = correctIdx;
+  // новый вопрос открываем с начала страницы (иначе остаётся прокрутка от предыдущего)
+  const view = state.ticket + ':' + state.current + ':' + state.review;
+  const viewChanged = view !== state._view;
+  state._view = view;
+  if (viewChanged) window.scrollTo(0, 0);
 
   document.getElementById('question-text').textContent = q.question;
 
@@ -240,14 +268,18 @@ function renderQuestion() {
 function selectAnswer(chosen) {
   if (state.answers[state.current] !== null || state.review) return;
 
+  const { options, correctIdx } = state.plan[state.current];
   state.answers[state.current] = {
-    options: state._opts,
-    correctIdx: state._correct,
+    options,
+    correctIdx,
     chosen,
-    isCorrect: chosen === state._correct
+    isCorrect: chosen === correctIdx
   };
   state.browsingPast = false;
   renderQuestion();
+  const fb = document.getElementById('feedback');
+  const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (fb) fb.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
 }
 
 function updateNav() {
