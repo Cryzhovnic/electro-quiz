@@ -207,7 +207,7 @@ function renderQuestion() {
   options.forEach((opt, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    let cls = 'option-btn w-full text-left py-4 px-4 rounded-2xl border transition-all flex items-start ';
+    let cls = 'option-btn w-full text-left py-4 px-4 rounded-2xl border transition-all flex items-center ';
     if (isLocked) {
       cls += 'cursor-default ';
       if (i === correctIdx) cls += 'bg-emerald-900/50 border-emerald-500/60 ';
