@@ -487,16 +487,31 @@ function buildSearchIndex() {
   return Array.from(unique.values());
 }
 
+// Как Python \w: буквы (в т.ч. кириллица) + цифры + _
+const WORD_RE = /[\p{L}\p{N}_]+/gu;
+const WORD_CHAR = /[\p{L}\p{N}_]/u;
+
 function searchQuestions(query) {
   if (!searchIndex) searchIndex = buildSearchIndex();
-  const stems = (norm(query).match(/\w+/g) || [])
+  // как в боте: re.findall(r'\w+', norm(query)) + len > 1 + stem
+  const stems = (norm(query).match(WORD_RE) || [])
     .filter(w => w.length > 1)
     .map(stem);
   if (!stems.length) return { results: [], total: 0 };
 
   function has(s, text) {
+    // короткие стемы — только целое слово (как (?<!\w)...(?!\w) в боте)
     if (s.length <= 3) {
-      return new RegExp('(?:^|\\W)' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:\\W|$)').test(text);
+      let from = 0;
+      while (from <= text.length) {
+        const i = text.indexOf(s, from);
+        if (i === -1) return false;
+        const before = i === 0 || !WORD_CHAR.test(text[i - 1]);
+        const after = i + s.length >= text.length || !WORD_CHAR.test(text[i + s.length]);
+        if (before && after) return true;
+        from = i + 1;
+      }
+      return false;
     }
     return text.includes(s);
   }
