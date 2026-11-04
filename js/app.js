@@ -628,7 +628,10 @@ function openSearch() {
   }
   if (input) {
     input.value = '';
-    setTimeout(() => input.focus(), 100);
+    // На телефоне автофокус сразу открывает клавиатуру и прячет подсказку —
+    // фокусируем только на устройствах с мышью/тачпадом.
+    const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (!coarse) setTimeout(() => input.focus(), 100);
   }
 }
 
