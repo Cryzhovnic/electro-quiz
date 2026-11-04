@@ -539,36 +539,27 @@ function escapeHtml(str) {
 // --- PIN ---
 function resetPin() {
   pinValue = '';
-  updatePinDots();
   const dots = document.querySelectorAll('#pin-dots .pin-dot');
-  dots.forEach(d => {
-    d.classList.remove('bg-sky-500', 'border-sky-500', 'bg-red-500', 'border-red-500', 'animate-shake');
-    d.classList.add('bg-transparent', 'border-slate-500');
-  });
+  dots.forEach(d => d.classList.remove('filled', 'error'));
 }
 
 function updatePinDots() {
   const dots = document.querySelectorAll('#pin-dots .pin-dot');
   dots.forEach((d, i) => {
-    if (i < pinValue.length) {
-      d.classList.remove('bg-transparent', 'border-slate-500');
-      d.classList.add('bg-sky-500', 'border-sky-500');
-    } else {
-      d.classList.remove('bg-sky-500', 'border-sky-500');
-      d.classList.add('bg-transparent', 'border-slate-500');
-    }
+    d.classList.remove('error');
+    d.classList.toggle('filled', i < pinValue.length);
   });
 }
 
 function showPinError() {
   const dots = document.querySelectorAll('#pin-dots .pin-dot');
   dots.forEach(d => {
-    d.classList.remove('bg-sky-500', 'border-sky-500');
-    d.classList.add('bg-red-500', 'border-red-500');
+    d.classList.remove('filled');
+    d.classList.add('error');
   });
   setTimeout(() => {
     pinValue = '';
-    updatePinDots();
+    resetPin();
   }, 400);
 }
 
@@ -655,15 +646,15 @@ function renderSearchResults(query) {
   if (hint) hint.classList.add('hidden');
 
   let html = results.map(item => `
-    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
-      <p class="text-xs font-medium text-sky-400/90 mb-2">📃 ${escapeHtml(formatPlaces(item.places))}</p>
-      <p class="text-[15px] leading-snug text-slate-200 mb-3">❓ ${escapeHtml(item.question)}</p>
-      <p class="text-[15px] leading-snug text-emerald-400/95"><span class="font-semibold">✅</span> ${escapeHtml(item.correct)}</p>
+    <div class="search-card">
+      <p class="text-xs font-medium text-sky-400 mb-2">📃 ${escapeHtml(formatPlaces(item.places))}</p>
+      <p class="text-sm leading-snug text-slate-200 mb-3">❓ ${escapeHtml(item.question)}</p>
+      <p class="text-sm leading-snug text-emerald-400"><span class="font-semibold">✅</span> ${escapeHtml(item.correct)}</p>
     </div>
   `).join('');
 
   if (total > results.length) {
-    html += `<p class="text-center text-sm text-slate-500 pt-1">… и ещё совпадений: ${total - results.length}. Уточни запрос.</p>`;
+    html += `<p class="text-center text-sm text-slate-400">… и ещё совпадений: ${total - results.length}. Уточни запрос.</p>`;
   }
   box.innerHTML = html;
 }
