@@ -47,8 +47,9 @@ function freshAnswers(n) {
 }
 
 function showScreen(id) {
-  ['start', 'tickets', 'quiz', 'result'].forEach(s => {
-    document.getElementById('screen-' + s).classList.toggle('hidden', s !== id);
+  ['start', 'tickets', 'quiz', 'result', 'pin', 'search'].forEach(s => {
+    const el = document.getElementById('screen-' + s);
+    if (el) el.classList.toggle('hidden', s !== id);
   });
   window.scrollTo(0, 0);
 }
@@ -56,6 +57,7 @@ function showScreen(id) {
 function goStart() {
   state = { ticket: null, current: 0, answers: [], plan: [], mode: null, review: false, browsingPast: false };
   closeExitModal();
+  resetPin();
   showScreen('start');
 }
 
@@ -436,6 +438,281 @@ function showResult() {
   showScreen('result');
 }
 
+// ===== СЕКРЕТНЫЙ ВХОД + ПОИСК (как в боте) =====
+const ADMIN_PIN = '1337';
+const SEARCH_LIMIT = 5;
+const SECRET_TAPS_NEEDED = 5;
+
+let secretTapCount = 0;
+let secretTapTimer = null;
+let pinValue = '';
+let searchIndex = null;
+
+const HOMOGLYPHS = {
+  'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'х': 'x',
+  'у': 'y', 'к': 'k', 'м': 'm', 'н': 'h', 'т': 't', 'в': 'b'
+};
+
+function norm(s) {
+  return String(s).toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[асеорхукмнтв]/g, ch => HOMOGLYPHS[ch] || ch);
+}
+
+function stem(word) {
+  if (word.length <= 4) return word;
+  return word.slice(0, Math.max(4, Math.min(6, word.length - 2)));
+}
+
+function buildSearchIndex() {
+  if (!examData) return [];
+  const unique = new Map();
+  for (const [ticketStr, questions] of Object.entries(examData)) {
+    const ticket = Number(ticketStr);
+    questions.forEach((q, idx) => {
+      const correctText = q.options[q.correct];
+      const key = norm(q.question) + '\0' + norm(correctText);
+      if (!unique.has(key)) {
+        unique.set(key, {
+          question: q.question,
+          correct: correctText,
+          q_norm: norm(q.question),
+          o_norm: norm(q.options.join(' ')),
+          places: []
+        });
+      }
+      unique.get(key).places.push([ticket, idx + 1]);
+    });
+  }
+  return Array.from(unique.values());
+}
+
+function searchQuestions(query) {
+  if (!searchIndex) searchIndex = buildSearchIndex();
+  const stems = (norm(query).match(/\w+/g) || [])
+    .filter(w => w.length > 1)
+    .map(stem);
+  if (!stems.length) return { results: [], total: 0 };
+
+  function has(s, text) {
+    if (s.length <= 3) {
+      return new RegExp('(?:^|\\W)' + s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?:\\W|$)').test(text);
+    }
+    return text.includes(s);
+  }
+
+  const scored = [];
+  for (const item of searchIndex) {
+    let score = 0;
+    for (const s of stems) {
+      if (has(s, item.q_norm)) score += 2;
+      else if (has(s, item.o_norm)) score += 1;
+    }
+    if (score) scored.push({ score, item });
+  }
+  if (!scored.length) return { results: [], total: 0 };
+
+  const best = Math.max(...scored.map(x => x.score));
+  const top = scored.filter(x => x.score === best).map(x => x.item);
+  return { results: top.slice(0, SEARCH_LIMIT), total: top.length };
+}
+
+function formatPlaces(places) {
+  const byTicket = {};
+  for (const [t, num] of places) {
+    if (!byTicket[t]) byTicket[t] = [];
+    byTicket[t].push(num);
+  }
+  return Object.keys(byTicket).sort((a, b) => a - b)
+    .map(t => `билет ${t}, вопрос ${byTicket[t].join(', ')}`)
+    .join('; ');
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// --- PIN ---
+function resetPin() {
+  pinValue = '';
+  updatePinDots();
+  const dots = document.querySelectorAll('#pin-dots .pin-dot');
+  dots.forEach(d => {
+    d.classList.remove('bg-sky-500', 'border-sky-500', 'bg-red-500', 'border-red-500', 'animate-shake');
+    d.classList.add('bg-transparent', 'border-slate-500');
+  });
+}
+
+function updatePinDots() {
+  const dots = document.querySelectorAll('#pin-dots .pin-dot');
+  dots.forEach((d, i) => {
+    if (i < pinValue.length) {
+      d.classList.remove('bg-transparent', 'border-slate-500');
+      d.classList.add('bg-sky-500', 'border-sky-500');
+    } else {
+      d.classList.remove('bg-sky-500', 'border-sky-500');
+      d.classList.add('bg-transparent', 'border-slate-500');
+    }
+  });
+}
+
+function showPinError() {
+  const dots = document.querySelectorAll('#pin-dots .pin-dot');
+  dots.forEach(d => {
+    d.classList.remove('bg-sky-500', 'border-sky-500');
+    d.classList.add('bg-red-500', 'border-red-500');
+  });
+  setTimeout(() => {
+    pinValue = '';
+    updatePinDots();
+  }, 400);
+}
+
+function onPinDigit(digit) {
+  if (pinValue.length >= 4) return;
+  pinValue += digit;
+  updatePinDots();
+  if (pinValue.length === 4) {
+    if (pinValue === ADMIN_PIN) {
+      setTimeout(() => {
+        resetPin();
+        openSearch();
+      }, 150);
+    } else {
+      showPinError();
+    }
+  }
+}
+
+function onPinBackspace() {
+  if (!pinValue.length) return;
+  pinValue = pinValue.slice(0, -1);
+  updatePinDots();
+}
+
+function openPinScreen() {
+  resetPin();
+  showScreen('pin');
+}
+
+// --- секретные тапы ---
+function onSecretTap() {
+  secretTapCount++;
+  if (secretTapTimer) clearTimeout(secretTapTimer);
+  secretTapTimer = setTimeout(() => { secretTapCount = 0; }, 2500);
+  if (secretTapCount >= SECRET_TAPS_NEEDED) {
+    secretTapCount = 0;
+    openPinScreen();
+  }
+}
+
+// --- поиск UI ---
+function openSearch() {
+  showScreen('search');
+  const input = document.getElementById('search-input');
+  const results = document.getElementById('search-results');
+  const hint = document.getElementById('search-hint');
+  if (results) results.innerHTML = '';
+  if (hint) {
+    hint.classList.remove('hidden');
+    hint.textContent = 'Введи часть вопроса или ответа';
+  }
+  if (input) {
+    input.value = '';
+    setTimeout(() => input.focus(), 100);
+  }
+}
+
+function renderSearchResults(query) {
+  const box = document.getElementById('search-results');
+  const hint = document.getElementById('search-hint');
+  if (!box) return;
+
+  const q = (query || '').trim();
+  if (!q) {
+    box.innerHTML = '';
+    if (hint) {
+      hint.classList.remove('hidden');
+      hint.textContent = 'Введи часть вопроса или ответа';
+    }
+    return;
+  }
+
+  const { results, total } = searchQuestions(q);
+  if (!results.length) {
+    box.innerHTML = '';
+    if (hint) {
+      hint.classList.remove('hidden');
+      hint.textContent = 'Ничего не найдено 🤷';
+    }
+    return;
+  }
+
+  if (hint) hint.classList.add('hidden');
+
+  let html = results.map(item => `
+    <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+      <p class="text-xs font-medium text-sky-400/90 mb-2">📃 ${escapeHtml(formatPlaces(item.places))}</p>
+      <p class="text-[15px] leading-snug text-slate-200 mb-3">❓ ${escapeHtml(item.question)}</p>
+      <p class="text-[15px] leading-snug text-emerald-400/95"><span class="font-semibold">✅</span> ${escapeHtml(item.correct)}</p>
+    </div>
+  `).join('');
+
+  if (total > results.length) {
+    html += `<p class="text-center text-sm text-slate-500 pt-1">… и ещё совпадений: ${total - results.length}. Уточни запрос.</p>`;
+  }
+  box.innerHTML = html;
+}
+
+function initSecretAndSearch() {
+  const zone = document.getElementById('secret-tap-zone');
+  if (zone) {
+    zone.addEventListener('click', onSecretTap);
+    // без pointer-events на img, чтобы клики шли в зону
+  }
+
+  document.querySelectorAll('.pin-key').forEach(btn => {
+    btn.addEventListener('click', () => onPinDigit(btn.dataset.digit));
+  });
+  const back = document.getElementById('pin-backspace');
+  if (back) back.addEventListener('click', onPinBackspace);
+
+  // клавиатура на PIN-экране
+  document.addEventListener('keydown', (e) => {
+    const pinScreen = document.getElementById('screen-pin');
+    if (!pinScreen || pinScreen.classList.contains('hidden')) return;
+    if (e.key >= '0' && e.key <= '9') {
+      e.preventDefault();
+      onPinDigit(e.key);
+    } else if (e.key === 'Backspace') {
+      e.preventDefault();
+      onPinBackspace();
+    } else if (e.key === 'Escape') {
+      goStart();
+    }
+  });
+
+  const input = document.getElementById('search-input');
+  if (input) {
+    let debounce = null;
+    input.addEventListener('input', () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => renderSearchResults(input.value), 180);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') goStart();
+    });
+  }
+}
+
 (async () => {
-  if (await loadData()) showScreen('start');
+  if (await loadData()) {
+    searchIndex = buildSearchIndex();
+    showScreen('start');
+    initSecretAndSearch();
+  }
 })();
