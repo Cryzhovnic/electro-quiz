@@ -606,11 +606,10 @@ function openSearch() {
   showScreen('search');
   const input = document.getElementById('search-input');
   const results = document.getElementById('search-results');
-  const hint = document.getElementById('search-hint');
-  if (results) results.innerHTML = '';
-  if (hint) {
-    hint.classList.remove('hidden');
-    hint.textContent = 'Введи часть вопроса или ответа';
+  const meta = document.getElementById('search-meta');
+  if (meta) meta.textContent = '';
+  if (results) {
+    results.innerHTML = '<p class="search-empty">Введи часть вопроса или ответа</p>';
   }
   if (input) {
     input.value = '';
@@ -620,41 +619,39 @@ function openSearch() {
 
 function renderSearchResults(query) {
   const box = document.getElementById('search-results');
-  const hint = document.getElementById('search-hint');
+  const meta = document.getElementById('search-meta');
   if (!box) return;
 
   const q = (query || '').trim();
   if (!q) {
-    box.innerHTML = '';
-    if (hint) {
-      hint.classList.remove('hidden');
-      hint.textContent = 'Введи часть вопроса или ответа';
-    }
+    if (meta) meta.textContent = '';
+    box.innerHTML = '<p class="search-empty">Введи часть вопроса или ответа</p>';
     return;
   }
 
   const { results, total } = searchQuestions(q);
   if (!results.length) {
-    box.innerHTML = '';
-    if (hint) {
-      hint.classList.remove('hidden');
-      hint.textContent = 'Ничего не найдено 🤷';
-    }
+    if (meta) meta.textContent = '';
+    box.innerHTML = '<p class="search-empty">Ничего не найдено</p>';
     return;
   }
 
-  if (hint) hint.classList.add('hidden');
+  if (meta) {
+    meta.textContent = total > results.length
+      ? `Показано ${results.length} из ${total}`
+      : (total === 1 ? '1 совпадение' : `Совпадений: ${total}`);
+  }
 
   let html = results.map(item => `
-    <div class="search-card">
-      <p class="text-xs font-medium text-sky-400 mb-2">📃 ${escapeHtml(formatPlaces(item.places))}</p>
-      <p class="text-sm leading-snug text-slate-200 mb-3">❓ ${escapeHtml(item.question)}</p>
-      <p class="text-sm leading-snug text-emerald-400"><span class="font-semibold">✅</span> ${escapeHtml(item.correct)}</p>
-    </div>
+    <article class="search-card">
+      <span class="search-places">${escapeHtml(formatPlaces(item.places))}</span>
+      <p class="search-q">${escapeHtml(item.question)}</p>
+      <p class="search-a">${escapeHtml(item.correct)}</p>
+    </article>
   `).join('');
 
   if (total > results.length) {
-    html += `<p class="text-center text-sm text-slate-400">… и ещё совпадений: ${total - results.length}. Уточни запрос.</p>`;
+    html += `<p class="search-more">Ещё ${total - results.length} — уточни запрос</p>`;
   }
   box.innerHTML = html;
 }
