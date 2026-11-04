@@ -16,6 +16,87 @@
   <title>Электробезопасность — Тестирование</title>
   <link rel="preload" href="assets/fonts/inter-var-latin-cyrillic.woff" as="font" type="font/woff" crossorigin />
   <link rel="stylesheet" href="css/tailwind.css" />
+  <style>
+    /* PIN + search: классы, которых нет в собранном tailwind.css */
+    .pin-pad {
+      display: grid;
+      grid-template-columns: repeat(3, 4.5rem);
+      gap: 0.85rem;
+      justify-content: center;
+    }
+    .pin-key, #pin-backspace, .pin-key-spacer {
+      width: 4.5rem;
+      height: 4.5rem;
+      border-radius: 9999px;
+      border: none;
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: #f1f5f9;
+      background: #1e293b;
+      transition: background .15s, transform .1s;
+    }
+    .pin-key:active, #pin-backspace:active {
+      background: #334155;
+      transform: scale(0.96);
+    }
+    .pin-key-spacer {
+      visibility: hidden;
+      pointer-events: none;
+    }
+    #pin-backspace {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #cbd5e1;
+    }
+    .pin-dot {
+      width: 0.85rem;
+      height: 0.85rem;
+      border-radius: 9999px;
+      border: 2px solid #64748b;
+      background: transparent;
+      transition: background .15s, border-color .15s;
+    }
+    .pin-dot.filled {
+      background: #0ea5e9;
+      border-color: #0ea5e9;
+    }
+    .pin-dot.error {
+      background: #ef4444;
+      border-color: #ef4444;
+    }
+    #search-input {
+      width: 100%;
+      padding: 0.9rem 1rem 0.9rem 2.75rem;
+      border-radius: 1rem;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f1f5f9;
+      font-size: 1rem;
+      outline: none;
+    }
+    #search-input::placeholder { color: #64748b; }
+    #search-input:focus {
+      border-color: #0ea5e9;
+      box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.35);
+    }
+    .search-icon {
+      position: absolute;
+      left: 0.9rem;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 1.25rem;
+      height: 1.25rem;
+      color: #64748b;
+      pointer-events: none;
+    }
+    .search-card {
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid #1e293b;
+      border-radius: 1rem;
+      padding: 1rem;
+    }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen antialiased">
 
@@ -135,30 +216,30 @@
   <!-- ===== ЭКРАН: PIN (секретный вход) ===== -->
   <div id="screen-pin" class="min-h-screen flex flex-col hidden">
     <div class="flex-1 flex flex-col items-center justify-center px-5 py-10">
-      <p class="text-slate-400 text-sm mb-6 tracking-wide">Введите код</p>
+      <p class="text-slate-400 text-sm mb-6">Введите код</p>
       <div id="pin-dots" class="flex gap-3 mb-10" aria-live="polite">
-        <span class="pin-dot w-3.5 h-3.5 rounded-full border-2 border-slate-500 bg-transparent transition-all"></span>
-        <span class="pin-dot w-3.5 h-3.5 rounded-full border-2 border-slate-500 bg-transparent transition-all"></span>
-        <span class="pin-dot w-3.5 h-3.5 rounded-full border-2 border-slate-500 bg-transparent transition-all"></span>
-        <span class="pin-dot w-3.5 h-3.5 rounded-full border-2 border-slate-500 bg-transparent transition-all"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
       </div>
-      <div class="grid grid-cols-3 gap-4 max-w-[260px] w-full">
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="1">1</button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="2">2</button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="3">3</button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="4">4</button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="5">5</button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="6">6</button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="7">7</button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="8">8</button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="9">9</button>
-        <button type="button" class="h-16 rounded-full opacity-0 pointer-events-none" aria-hidden="true"></button>
-        <button type="button" class="pin-key h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition text-2xl font-medium" data-digit="0">0</button>
-        <button type="button" id="pin-backspace" class="h-16 rounded-full bg-slate-800/80 hover:bg-slate-700 active:scale-95 transition flex items-center justify-center text-slate-300" aria-label="Стереть">
+      <div class="pin-pad">
+        <button type="button" class="pin-key" data-digit="1">1</button>
+        <button type="button" class="pin-key" data-digit="2">2</button>
+        <button type="button" class="pin-key" data-digit="3">3</button>
+        <button type="button" class="pin-key" data-digit="4">4</button>
+        <button type="button" class="pin-key" data-digit="5">5</button>
+        <button type="button" class="pin-key" data-digit="6">6</button>
+        <button type="button" class="pin-key" data-digit="7">7</button>
+        <button type="button" class="pin-key" data-digit="8">8</button>
+        <button type="button" class="pin-key" data-digit="9">9</button>
+        <button type="button" class="pin-key-spacer" aria-hidden="true" tabindex="-1"></button>
+        <button type="button" class="pin-key" data-digit="0">0</button>
+        <button type="button" id="pin-backspace" aria-label="Стереть">
           <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H19a2 2 0 002-2V7a2 2 0 00-2-2h-8.172a2 2 0 00-1.414.586L3 12z"/></svg>
         </button>
       </div>
-      <button type="button" onclick="goStart()" class="mt-10 text-sm text-slate-500 hover:text-slate-300 transition">Отмена</button>
+      <button type="button" onclick="goStart()" class="mt-10 text-sm text-slate-400 transition">Отмена</button>
     </div>
   </div>
 
@@ -166,20 +247,19 @@
   <div id="screen-search" class="min-h-screen flex flex-col hidden">
     <header class="sticky top-0 z-10 glass border-b border-slate-800 px-4 pb-4 pt-[calc(1rem+env(safe-area-inset-top))]">
       <div class="flex items-center gap-3 max-w-lg mx-auto">
-        <button type="button" onclick="goStart()" aria-label="Назад" class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center active:scale-95 transition shrink-0">
+        <button type="button" onclick="goStart()" aria-label="Назад" class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center transition shrink-0">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
         </button>
         <h2 class="text-lg font-semibold">Поиск ответов</h2>
       </div>
     </header>
     <div class="flex-1 px-4 py-5 max-w-lg mx-auto w-full flex flex-col">
-      <div class="relative mb-5">
-        <input id="search-input" type="search" autocomplete="off" enterkeyhint="search" placeholder="Часть вопроса или ответа…"
-          class="w-full py-3.5 pl-11 pr-4 rounded-2xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500/40 transition" />
-        <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <div class="relative mb-6">
+        <input id="search-input" type="search" autocomplete="off" enterkeyhint="search" placeholder="Часть вопроса или ответа…" />
+        <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
       </div>
-      <div id="search-results" class="flex-1 space-y-4 overflow-y-auto pb-8"></div>
-      <p id="search-hint" class="text-center text-sm text-slate-500 py-8">Введи часть вопроса или ответа</p>
+      <div id="search-results" class="flex-1 space-y-3" style="overflow-y:auto;padding-bottom:2rem"></div>
+      <p id="search-hint" class="text-center text-sm text-slate-400 py-10">Введи часть вопроса или ответа</p>
     </div>
   </div>
 
