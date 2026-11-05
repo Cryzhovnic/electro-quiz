@@ -75,7 +75,7 @@
       font-size: 1rem;
       outline: none;
     }
-    #search-input::placeholder { color: #64748b; }
+    #search-input::placeholder { color: #94a3b8; }
     #search-input:focus {
       border-color: #0ea5e9;
       box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.35);
@@ -131,12 +131,49 @@
       line-height: 1.5;
       padding: 1.5rem 0.75rem 0.5rem;
     }
-    .search-more {
-      text-align: center;
-      color: #64748b;
-      font-size: 0.8rem;
-      padding: 0.5rem 0 1rem;
+    .search-more-btn {
+      display: block;
+      width: 100%;
+      margin: 0.25rem 0 1rem;
+      padding: 0.85rem 1rem;
+      border-radius: 0.9rem;
+      border: 1px solid rgba(14, 165, 233, 0.45);
+      background: rgba(8, 47, 73, 0.5);
+      color: #7dd3fc;
+      font-size: 0.95rem;
+      font-weight: 600;
+      transition: background .15s, transform .1s;
     }
+    .search-more-btn:hover { background: rgba(12, 74, 110, 0.6); }
+    .search-more-btn:active { transform: scale(0.98); }
+    .search-card mark {
+      background: rgba(250, 204, 21, 0.22);
+      color: #fde68a;
+      border-radius: 0.25rem;
+      padding: 0 0.1rem;
+    }
+    /* Основные кнопки: белый текст на sky-700 даёт контраст ≥ 5:1 */
+    .btn-sky { background: #0369a1; }
+    .btn-sky:hover { background: #0284c7; }
+    /* PIN: подсветка для клавиатуры и мыши, нормальная зона нажатия у «Отмена» */
+    .pin-key:focus-visible, #pin-backspace:focus-visible, .pin-cancel:focus-visible,
+    .search-more-btn:focus-visible {
+      outline: 2px solid #38bdf8;
+      outline-offset: 3px;
+    }
+    @media (hover: hover) {
+      .pin-key:hover, #pin-backspace:hover { background: #2a3a52; }
+    }
+    .pin-cancel {
+      margin-top: 2.5rem;
+      padding: 0.6rem 1.25rem;
+      border-radius: 0.75rem;
+      font-size: 0.875rem;
+      color: #94a3b8;
+      background: transparent;
+      transition: color .15s;
+    }
+    .pin-cancel:hover { color: #e2e8f0; }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen antialiased">
@@ -205,7 +242,7 @@
       <!-- Навигация после ответа / в просмотре -->
       <div id="feedback" class="hidden mt-5 animate-slide-up">
         <!-- обычный режим: одна кнопка -->
-        <button id="btn-next" class="w-full py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold active:scale-[0.98] transition-all">
+        <button id="btn-next" class="btn-sky w-full py-3.5 rounded-xl text-white font-semibold active:scale-[0.98] transition-all">
           Следующий вопрос →
         </button>
         <!-- режим просмотра: 3 в ряд -->
@@ -243,7 +280,7 @@
         <button onclick="startReview()" class="w-full py-3.5 rounded-xl bg-sky-950/50 hover:bg-sky-900/60 border border-sky-600/50 text-sky-300 font-semibold active:scale-[0.98] transition-all">
           Разбор вопросов
         </button>
-        <button onclick="startRandom()" class="w-full py-3.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-semibold active:scale-[0.98] transition-all">
+        <button onclick="startRandom()" class="btn-sky w-full py-3.5 rounded-xl text-white font-semibold active:scale-[0.98] transition-all">
           Ещё один случайный
         </button>
         <button onclick="goStart()" class="w-full py-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-medium active:scale-[0.98] transition-all">
@@ -280,7 +317,7 @@
           <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 001.414.586H19a2 2 0 002-2V7a2 2 0 00-2-2h-8.172a2 2 0 00-1.414.586L3 12z"/></svg>
         </button>
       </div>
-      <button type="button" onclick="goStart()" class="mt-10 text-sm text-slate-400 transition">Отмена</button>
+      <button type="button" onclick="goStart()" class="pin-cancel">Отмена</button>
     </div>
   </div>
 
