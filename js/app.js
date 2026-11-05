@@ -644,7 +644,7 @@ function formatPlaces(places) {
     byTicket[t].push(num);
   }
   return Object.keys(byTicket).sort((a, b) => a - b)
-    .map(t => `Билет ${t}, вопрос ${byTicket[t].join(', ')}`)
+    .map(t => `билет ${t}, вопрос ${byTicket[t].join(', ')}`)
     .join('; ');
 }
 
