@@ -46,22 +46,59 @@ function freshAnswers(n) {
   return Array(n).fill(null);
 }
 
-function showScreen(id) {
+// История браузера: «Назад» (свайп / системная кнопка) не должен закрывать приложение.
+// Главная — базовая запись; любой другой экран занимает ровно одну запись поверх неё.
+let currentScreen = 'start';
+
+function showScreen(id, fromHistory) {
   ['start', 'tickets', 'quiz', 'result', 'pin', 'search'].forEach(s => {
     const el = document.getElementById('screen-' + s);
     if (el) el.classList.toggle('hidden', s !== id);
   });
+  currentScreen = id;
   window.scrollTo(0, 0);
+  if (fromHistory) return;
+  try {
+    const cur = history.state && history.state.screen;
+    if (id === 'start') {
+      if (cur && cur !== 'start') history.back(); // вернёмся на базовую запись
+    } else if (!cur || cur === 'start') {
+      history.pushState({ screen: id }, '');
+    } else {
+      history.replaceState({ screen: id }, '');
+    }
+  } catch (e) {}
 }
 
-function goStart() {
+function quizInProgress() {
+  return currentScreen === 'quiz' && !state.review && state.answers.some(a => a === null);
+}
+
+window.addEventListener('popstate', (e) => {
+  const target = (e.state && e.state.screen) || 'start';
+  if (target === currentScreen) return;
+  if (quizInProgress()) {
+    // вернули запись квиза на место и спросили подтверждение, а не вылетаем
+    try { history.pushState({ screen: 'quiz' }, ''); } catch (err) {}
+    exitQuiz();
+    return;
+  }
+  goStart(true);
+});
+
+function goStart(fromHistory) {
   state = { ticket: null, current: 0, answers: [], plan: [], mode: null, review: false, browsingPast: false };
   closeExitModal();
   resetPin();
-  showScreen('start');
+  showScreen('start', fromHistory === true);
+  if (fromHistory === true) {
+    try { history.replaceState({ screen: 'start' }, ''); } catch (err) {}
+  }
 }
 
 function exitQuiz() {
+  const modal = document.getElementById('exit-modal');
+  if (modal && !modal.classList.contains('hidden')) return; // уже открыта
   exitModalOpener = document.activeElement;
   document.getElementById('exit-modal').classList.remove('hidden');
   document.body.style.overflow = 'hidden';
@@ -439,7 +476,11 @@ function showResult() {
 }
 
 // ===== СЕКРЕТНЫЙ ВХОД + ПОИСК (как в боте) =====
-const ADMIN_PIN = '1337';
+// PIN хранится как SHA-256 от (соль + PIN). Это скрывает код от беглого взгляда в исходники,
+// но не защита: 4 цифры подбираются мгновенно. Чтобы сменить PIN, см. README.
+// Нужен защищённый контекст (https / localhost) — на GitHub Pages он есть.
+const PIN_SALT = 'eq:v1:';
+const PIN_HASH = 'f6489ea2bfdf1e7b4b35845bae9a1ec0755f153a458af7c38860679f669a18e4';
 const SEARCH_LIMIT = 5;
 const SECRET_TAPS_NEEDED = 5;
 
@@ -447,6 +488,25 @@ let secretTapCount = 0;
 let secretTapTimer = null;
 let pinValue = '';
 let searchIndex = null;
+let searchShowAll = false;
+let pinChecking = false;
+
+async function sha256Hex(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function pinIsValid(pin) {
+  try {
+    return (await sha256Hex(PIN_SALT + pin)) === PIN_HASH;
+  } catch (e) {
+    return false;
+  }
+}
+
+function buzz(ms) {
+  try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
+}
 
 const HOMOGLYPHS = {
   'а': 'a', 'с': 'c', 'е': 'e', 'о': 'o', 'р': 'p', 'х': 'x',
@@ -491,30 +551,45 @@ function buildSearchIndex() {
 const WORD_RE = /[\p{L}\p{N}_]+/gu;
 const WORD_CHAR = /[\p{L}\p{N}_]/u;
 
-function searchQuestions(query) {
-  if (!searchIndex) searchIndex = buildSearchIndex();
+// Границы совпадения для коротких стемов:
+//  1–2 буквы — только целое слово (аббревиатуры: «ВЛ», «ЛЭП»);
+//  3 буквы — с начала слова («ток» → «тока», «током»);
+//  4+ — любая подстрока.
+function matchAt(s, text, i) {
+  if (s.length > 3) return true;
+  const before = i === 0 || !WORD_CHAR.test(text[i - 1]);
+  const after = s.length === 3 || i + s.length >= text.length || !WORD_CHAR.test(text[i + s.length]);
+  return before && after;
+}
+
+function findMatches(s, text, firstOnly) {
+  const out = [];
+  let from = 0;
+  while (from <= text.length) {
+    const i = text.indexOf(s, from);
+    if (i === -1) break;
+    if (matchAt(s, text, i)) {
+      out.push(i);
+      if (firstOnly) break;
+    }
+    from = i + 1;
+  }
+  return out;
+}
+
+function queryStems(query) {
   // как в боте: re.findall(r'\w+', norm(query)) + len > 1 + stem
-  const stems = (norm(query).match(WORD_RE) || [])
+  return (norm(query).match(WORD_RE) || [])
     .filter(w => w.length > 1)
     .map(stem);
-  if (!stems.length) return { results: [], total: 0 };
+}
 
-  function has(s, text) {
-    // короткие стемы — только целое слово (как (?<!\w)...(?!\w) в боте)
-    if (s.length <= 3) {
-      let from = 0;
-      while (from <= text.length) {
-        const i = text.indexOf(s, from);
-        if (i === -1) return false;
-        const before = i === 0 || !WORD_CHAR.test(text[i - 1]);
-        const after = i + s.length >= text.length || !WORD_CHAR.test(text[i + s.length]);
-        if (before && after) return true;
-        from = i + 1;
-      }
-      return false;
-    }
-    return text.includes(s);
-  }
+function searchQuestions(query, limit) {
+  if (!searchIndex) searchIndex = buildSearchIndex();
+  const stems = queryStems(query);
+  if (!stems.length) return { results: [], total: 0, stems };
+
+  const has = (s, text) => findMatches(s, text, true).length > 0;
 
   const scored = [];
   for (const item of searchIndex) {
@@ -525,11 +600,41 @@ function searchQuestions(query) {
     }
     if (score) scored.push({ score, item });
   }
-  if (!scored.length) return { results: [], total: 0 };
+  if (!scored.length) return { results: [], total: 0, stems };
 
   const best = Math.max(...scored.map(x => x.score));
   const top = scored.filter(x => x.score === best).map(x => x.item);
-  return { results: top.slice(0, SEARCH_LIMIT), total: top.length };
+  return { results: top.slice(0, limit === undefined ? SEARCH_LIMIT : limit), total: top.length, stems };
+}
+
+// Подсветка найденных слов целиком. Нормализация не меняет длину строки,
+// поэтому позиции из нормализованного текста подходят к исходному.
+function highlight(text, stems) {
+  const n = norm(text);
+  if (n.length !== text.length) return escapeHtml(text);
+  const marks = [];
+  for (const s of stems) {
+    for (const i of findMatches(s, n, false)) {
+      let end = i + s.length;
+      while (end < n.length && WORD_CHAR.test(n[end])) end++;
+      marks.push([i, end]);
+    }
+  }
+  if (!marks.length) return escapeHtml(text);
+  marks.sort((a, b) => a[0] - b[0]);
+  const merged = [marks[0].slice()];
+  for (let k = 1; k < marks.length; k++) {
+    const last = merged[merged.length - 1];
+    if (marks[k][0] <= last[1]) last[1] = Math.max(last[1], marks[k][1]);
+    else merged.push(marks[k].slice());
+  }
+  let html = '';
+  let pos = 0;
+  for (const [a, b] of merged) {
+    html += escapeHtml(text.slice(pos, a)) + '<mark>' + escapeHtml(text.slice(a, b)) + '</mark>';
+    pos = b;
+  }
+  return html + escapeHtml(text.slice(pos));
 }
 
 function formatPlaces(places) {
@@ -554,6 +659,7 @@ function escapeHtml(str) {
 // --- PIN ---
 function resetPin() {
   pinValue = '';
+  pinChecking = false;
   const dots = document.querySelectorAll('#pin-dots .pin-dot');
   dots.forEach(d => d.classList.remove('filled', 'error'));
 }
@@ -572,30 +678,43 @@ function showPinError() {
     d.classList.remove('filled');
     d.classList.add('error');
   });
+  buzz(60);
   setTimeout(() => {
+    pinChecking = false;
     pinValue = '';
     resetPin();
   }, 400);
 }
 
+function pinScreenOpen() {
+  const el = document.getElementById('screen-pin');
+  return !!el && !el.classList.contains('hidden');
+}
+
 function onPinDigit(digit) {
-  if (pinValue.length >= 4) return;
+  if (pinChecking || pinValue.length >= 4) return;
   pinValue += digit;
+  buzz(8);
   updatePinDots();
   if (pinValue.length === 4) {
-    if (pinValue === ADMIN_PIN) {
-      setTimeout(() => {
-        resetPin();
-        openSearch();
-      }, 150);
-    } else {
-      showPinError();
-    }
+    pinChecking = true;
+    pinIsValid(pinValue).then(ok => {
+      if (!pinScreenOpen()) { pinChecking = false; return; } // ушли с экрана, пока считался хеш
+      if (ok) {
+        setTimeout(() => {
+          pinChecking = false;
+          resetPin();
+          openSearch();
+        }, 150);
+      } else {
+        showPinError();
+      }
+    });
   }
 }
 
 function onPinBackspace() {
-  if (!pinValue.length) return;
+  if (pinChecking || !pinValue.length) return;
   pinValue = pinValue.slice(0, -1);
   updatePinDots();
 }
@@ -618,6 +737,7 @@ function onSecretTap() {
 
 // --- поиск UI ---
 function openSearch() {
+  searchShowAll = false;
   showScreen('search');
   const input = document.getElementById('search-input');
   const results = document.getElementById('search-results');
@@ -647,7 +767,7 @@ function renderSearchResults(query) {
     return;
   }
 
-  const { results, total } = searchQuestions(q);
+  const { results, total, stems } = searchQuestions(q, searchShowAll ? Infinity : SEARCH_LIMIT);
   if (!results.length) {
     if (meta) meta.textContent = '';
     box.innerHTML = '<p class="search-empty">Ничего не найдено</p>';
@@ -663,15 +783,23 @@ function renderSearchResults(query) {
   let html = results.map(item => `
     <article class="search-card">
       <span class="search-places">${escapeHtml(formatPlaces(item.places))}</span>
-      <p class="search-q">${escapeHtml(item.question)}</p>
-      <p class="search-a">${escapeHtml(item.correct)}</p>
+      <p class="search-q">${highlight(item.question, stems)}</p>
+      <p class="search-a">${highlight(item.correct, stems)}</p>
     </article>
   `).join('');
 
   if (total > results.length) {
-    html += `<p class="search-more">Ещё ${total - results.length} — уточни запрос</p>`;
+    html += `<button type="button" id="search-show-all" class="search-more-btn">Показать все (${total})</button>`;
   }
   box.innerHTML = html;
+
+  const more = document.getElementById('search-show-all');
+  if (more) {
+    more.addEventListener('click', () => {
+      searchShowAll = true;
+      renderSearchResults(query);
+    });
+  }
 }
 
 function initSecretAndSearch() {
@@ -689,8 +817,7 @@ function initSecretAndSearch() {
 
   // клавиатура на PIN-экране
   document.addEventListener('keydown', (e) => {
-    const pinScreen = document.getElementById('screen-pin');
-    if (!pinScreen || pinScreen.classList.contains('hidden')) return;
+    if (!pinScreenOpen()) return;
     if (e.key >= '0' && e.key <= '9') {
       e.preventDefault();
       onPinDigit(e.key);
@@ -706,6 +833,7 @@ function initSecretAndSearch() {
   if (input) {
     let debounce = null;
     input.addEventListener('input', () => {
+      searchShowAll = false;
       clearTimeout(debounce);
       debounce = setTimeout(() => renderSearchResults(input.value), 180);
     });
@@ -718,7 +846,8 @@ function initSecretAndSearch() {
 (async () => {
   if (await loadData()) {
     searchIndex = buildSearchIndex();
-    showScreen('start');
+    try { history.replaceState({ screen: 'start' }, ''); } catch (e) {}
+    showScreen('start', true);
     initSecretAndSearch();
   }
 })();
