@@ -2,7 +2,9 @@
 let examData = null;
 
 // Формат data/exam_data.txt общий с Telegram-ботом (elecbot), описан в шапке самого файла.
-// Разбор повторяет парсер бота (data.go), чтобы оба проекта читали файл одинаково.
+// Разбор повторяет парсер бота (data.go), чтобы оба проекта читали файл одинаково:
+//   # Билет N · ? вопрос · - неверный · + правильный · строка без маркера продолжает предыдущую
+//   (с переносом строки), // комментарий, пустые строки игнорируются.
 function parseExamData(text) {
   const tickets = {};
   const declared = new Set();
@@ -15,48 +17,47 @@ function parseExamData(text) {
     cur = null;
     const where = `строка ${b.line}: «${b.text.slice(0, 60)}»`;
     if (b.opts.length < 2) throw new Error(`${where} — меньше двух вариантов ответа`);
-    if (b.correct.length !== 1) throw new Error(`${where} — должен быть ровно один правильный ответ («+ »)`);
+    if (b.correct.length === 0) throw new Error(`${where} — нет правильного ответа (нужна строка «+ »)`);
+    if (b.correct.length > 1) throw new Error(`${where} — несколько правильных ответов (нужен ровно один «+ »)`);
     tickets[ticket].push({ question: b.text, options: b.opts, correct: b.correct[0] });
   };
-  const isMarker = (s) => s === '-' || s === '+' || s.startsWith('- ') || s.startsWith('+ ');
+  const isMarker = (s) => /^[?+-](\s|$)/.test(s);
 
   const lines = text.replace(/^\uFEFF/, '').split('\n');
   lines.forEach((rawLine, i) => {
     const lineNo = i + 1;
-    const raw = rawLine.replace(/[ \t\r]+$/, '');
-    const trimmed = raw.trim();
-    const indented = raw !== '' && (raw[0] === ' ' || raw[0] === '\t');
+    const line = rawLine.trim();
     const at = (msg) => new Error(`exam_data.txt:${lineNo}: ${msg}`);
 
-    if (trimmed === '') {
+    if (line === '' || line.startsWith('//')) return;
+
+    if (line.startsWith('#')) {
       flush();
-    } else if (trimmed.startsWith('//')) {
-      // комментарий
-    } else if (!indented && raw.startsWith('#')) {
-      flush();
-      const m = /^#\s*билет\s+(\d+)\s*$/i.exec(raw);
+      const m = /^#\s*билет\s+(\d+)$/i.exec(line);
       if (!m) throw at('ожидался заголовок вида «# Билет 3»');
       const n = Number(m[1]);
-      if (n <= 0 || declared.has(n)) throw at(`неверный или повторный номер билета ${n}`);
+      if (n <= 0) throw at('номер билета должен быть больше нуля');
+      if (declared.has(n)) throw at(`билет ${n} уже был объявлен`);
       declared.add(n);
       ticket = n;
       tickets[n] = [];
-    } else if (!indented && isMarker(raw)) {
-      if (!cur) throw at('вариант ответа без вопроса');
-      const t = raw.slice(1).trim();
+    } else if (line[0] === '?' && isMarker(line)) {
+      if (!ticket) throw at('вопрос до первого заголовка «# Билет N»');
+      flush();
+      const t = line.slice(1).trim();
+      if (!t) throw at('пустой вопрос');
+      cur = { line: lineNo, text: t, opts: [], correct: [] };
+    } else if (isMarker(line)) {
+      if (!cur) throw at('вариант ответа без вопроса: перед ним нужна строка «? текст вопроса»');
+      const t = line.slice(1).trim();
       if (!t) throw at('пустой вариант ответа');
       cur.opts.push(t);
-      if (raw[0] === '+') cur.correct.push(cur.opts.length - 1);
-    } else if (indented) {
-      if (!cur) throw at('строка с отступом без вопроса');
-      if (isMarker(trimmed)) throw at('строка с отступом начинается с «- » или «+ »');
-      if (cur.opts.length === 0) cur.text += ' ' + trimmed;
-      else cur.opts[cur.opts.length - 1] += ' ' + trimmed;
+      if (line[0] === '+') cur.correct.push(cur.opts.length - 1);
     } else {
-      if (!ticket) throw at('текст до первого заголовка «# Билет N»');
-      if (!cur) cur = { line: lineNo, text: trimmed, opts: [], correct: [] };
-      else if (cur.opts.length > 0) throw at('после вариантов нужна пустая строка перед следующим вопросом');
-      else cur.text += ' ' + trimmed;
+      // строка без маркера продолжает предыдущую (с переносом строки)
+      if (!cur) throw at('текст вне вопроса: строка без «?», «+», «-» должна продолжать вопрос или вариант');
+      if (cur.opts.length === 0) cur.text += '\n' + line;
+      else cur.opts[cur.opts.length - 1] += '\n' + line;
     }
   });
   flush();
@@ -350,7 +351,9 @@ function renderQuestion() {
   state._view = view;
   if (viewChanged) window.scrollTo(0, 0);
 
-  document.getElementById('question-text').textContent = q.question;
+  const qEl = document.getElementById('question-text');
+  qEl.textContent = q.question;
+  qEl.style.whiteSpace = 'pre-line'; // переносы строк из exam_data.txt
 
   const list = document.getElementById('options-list');
   list.innerHTML = '';
@@ -388,6 +391,7 @@ function renderQuestion() {
     const text = document.createElement('span');
     text.className = 'text-[15px] leading-snug';
     text.textContent = opt;
+    text.style.whiteSpace = 'pre-line';
 
     btn.appendChild(num);
     btn.appendChild(text);
